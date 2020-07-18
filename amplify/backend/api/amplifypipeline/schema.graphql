@@ -1,3 +1,14 @@
+type Mutation {
+  signupUser(input: SignupUserInput!): User
+}
+
+input SignupUserInput {
+  id: ID
+  name: String!
+  email: AWSEmail!
+  password: String
+}
+
 type User @model {
   id: ID!
   name: String!
