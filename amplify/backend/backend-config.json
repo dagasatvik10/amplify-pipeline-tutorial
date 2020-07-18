@@ -16,5 +16,13 @@
 				}
 			}
 		}
+	},
+	"function": {
+		"amplifypipelineHashPassword": {
+			"build": true,
+			"providerPlugin": "awscloudformation",
+			"service": "Lambda",
+			"dependsOn": []
+		}
 	}
 }
