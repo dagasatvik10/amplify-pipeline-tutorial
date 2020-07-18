@@ -27,6 +27,166 @@
     }
   },
   "Resources": {
+    "InvokeHashPasswordLambdaDataSource": {
+      "Type": "AWS::AppSync::FunctionConfiguration",
+      "Properties": {
+        "ApiId": {
+          "Ref": "AppSyncApiId"
+        },
+        "Name": "InvokeHashPasswordLambdaDataSource",
+        "DataSourceName": "HashPasswordLambdaDataSource",
+        "FunctionVersion": "2018-05-29",
+        "RequestMappingTemplateS3Location": {
+          "Fn::Sub": [
+            "s3://${S3DeploymentBucket}/${S3DeploymentRootKey}/pipelineFunctions/${ResolverFileName}",
+            {
+              "S3DeploymentBucket": {
+                "Ref": "S3DeploymentBucket"
+              },
+              "S3DeploymentRootKey": {
+                "Ref": "S3DeploymentRootKey"
+              },
+              "ResolverFileName": {
+                "Fn::Join": [".", ["InvokeHashPasswordLambdaDataSource", "req", "vtl"]]
+              }
+            }
+          ]
+        },
+        "ResponseMappingTemplateS3Location": {
+          "Fn::Sub": [
+            "s3://${S3DeploymentBucket}/${S3DeploymentRootKey}/pipelineFunctions/${ResolverFileName}",
+            {
+              "S3DeploymentBucket": {
+                "Ref": "S3DeploymentBucket"
+              },
+              "S3DeploymentRootKey": {
+                "Ref": "S3DeploymentRootKey"
+              },
+              "ResolverFileName": {
+                "Fn::Join": [".", ["InvokeHashPasswordLambdaDataSource", "res", "vtl"]]
+              }
+            }
+          ]
+        }
+      },
+      "DependsOn": "HashPasswordLambdaDataSource"
+    },
+    "HashPasswordLambdaDataSourceRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": {
+          "Fn::If": [
+            "HasEnvironmentParameter",
+            {
+              "Fn::Join": [
+                "-",
+                [
+                  "HashPasswordLambdabf85",
+                  {
+                    "Ref": "AppSyncApiId"
+                  },
+                  {
+                    "Ref": "env"
+                  }
+                ]
+              ]
+            },
+            {
+              "Fn::Join": [
+                "-",
+                [
+                  "HashPasswordLambdabf85",
+                  {
+                    "Ref": "AppSyncApiId"
+                  }
+                ]
+              ]
+            }
+          ]
+        },
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "appsync.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "InvokeLambdaFunction",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": ["lambda:InvokeFunction"],
+                  "Resource": {
+                    "Fn::If": [
+                      "HasEnvironmentParameter",
+                      {
+                        "Fn::Sub": [
+                          "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:amplifypipelineHashPassword-${env}",
+                          {
+                            "env": {
+                              "Ref": "env"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "Fn::Sub": [
+                          "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:amplifypipelineHashPassword",
+                          {}
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "HashPasswordLambdaDataSource": {
+      "Type": "AWS::AppSync::DataSource",
+      "Properties": {
+        "ApiId": {
+          "Ref": "AppSyncApiId"
+        },
+        "Name": "HashPasswordLambdaDataSource",
+        "Type": "AWS_LAMBDA",
+        "ServiceRoleArn": {
+          "Fn::GetAtt": ["HashPasswordLambdaDataSourceRole", "Arn"]
+        },
+        "LambdaConfig": {
+          "LambdaFunctionArn": {
+            "Fn::If": [
+              "HasEnvironmentParameter",
+              {
+                "Fn::Sub": [
+                  "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:amplifypipelineHashPassword-${env}",
+                  {
+                    "env": {
+                      "Ref": "env"
+                    }
+                  }
+                ]
+              },
+              {
+                "Fn::Sub": ["arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:amplifypipelineHashPassword", {}]
+              }
+            ]
+          }
+        }
+      },
+      "DependsOn": "HashPasswordLambdaDataSourceRole"
+    },
     "MutationCreateUserFunction": {
       "Type": "AWS::AppSync::FunctionConfiguration",
       "Properties": {
@@ -82,6 +242,9 @@
         "PipelineConfig": {
           "Functions": [
             {
+              "Fn::GetAtt": ["InvokeHashPasswordLambdaDataSource", "FunctionId"]
+            },
+            {
               "Fn::GetAtt": ["MutationCreateUserFunction", "FunctionId"]
             }
           ]
@@ -119,7 +282,7 @@
           ]
         }
       },
-      "DependsOn": ["MutationCreateUserFunction"]
+      "DependsOn": ["MutationCreateUserFunction", "InvokeHashPasswordLambdaDataSource"]
     }
   },
   "Conditions": {
